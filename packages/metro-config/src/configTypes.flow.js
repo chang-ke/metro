@@ -119,6 +119,8 @@ type TransformerConfigT = {|
   workerPath: string,
   publicPath: string,
   experimentalImportBundleSupport: boolean,
+  experimentalTreeShaking: boolean,
+  treeShakingPathIgnore: (absolutePath: string) => boolean,
 |};
 
 type MetalConfigT = {|

@@ -178,6 +178,7 @@ function transform({
   plugins,
 }: BabelTransformerArgs): {
   ast: BabelNodeFile,
+  sourceAst: BabelNodeFile,
   functionMap: ?FBSourceFunctionMap,
   ...
 } {
@@ -205,10 +206,10 @@ function transform({
     if (!result) {
       /* $FlowFixMe BabelTransformer specifies that the `ast` can never be null but
        * the function returns here. Discovered when typing `BabelNode`. */
-      return {ast: null, functionMap};
+      return {ast: null, sourceAst, functionMap};
     }
 
-    return {ast: nullthrows(result.ast), functionMap};
+    return {ast: nullthrows(result.ast), sourceAst, functionMap};
   } finally {
     if (OLD_BABEL_ENV) {
       process.env.BABEL_ENV = OLD_BABEL_ENV;

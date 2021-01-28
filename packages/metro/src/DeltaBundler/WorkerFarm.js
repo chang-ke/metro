@@ -113,7 +113,7 @@ class WorkerFarm {
       // Force color to print syntax highlighted code frames.
       FORCE_COLOR: 1,
     };
-
+    // worker will serialize transform output
     return new JestWorker(workerPath, {
       computeWorkerKey: this._config.stickyWorkers
         ? this._computeWorkerKey

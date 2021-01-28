@@ -14,6 +14,7 @@
 const createModuleIdFactory = require('../../../../lib/createModuleIdFactory');
 
 const {wrapModule} = require('../js');
+const babylon = require('@babel/parser');
 
 let myModule;
 
@@ -25,19 +26,51 @@ beforeEach(() => {
         'bar',
         {
           absolutePath: '/bar',
-          data: {data: {asyncType: null, locs: []}, name: 'bar'},
+          data: {
+            data: {
+              asyncType: null,
+              locs: [],
+              importee: {
+                exports: {},
+                sideEffect: false,
+                exportAll: {references: 0},
+                exportDefault: {references: 0},
+              },
+            },
+            name: 'bar',
+          },
         },
       ],
       [
         'baz',
         {
           absolutePath: '/baz',
-          data: {data: {asyncType: null, locs: []}, name: 'baz'},
+          data: {
+            data: {
+              asyncType: null,
+              locs: [],
+              importee: {
+                exports: {},
+                sideEffect: false,
+                exportAll: {references: 0},
+                exportDefault: {references: 0},
+              },
+            },
+            name: 'baz',
+          },
         },
       ],
     ]),
     getSource: () => Buffer.from(''),
     inverseDependencies: new Set(),
+    namedExports: [],
+    importee: {
+      exports: {},
+      sideEffect: false,
+      exportAll: {references: 0},
+      exportDefault: {references: 0},
+    },
+    sourceAst: babylon.parse('', {}),
     output: [
       {
         data: {

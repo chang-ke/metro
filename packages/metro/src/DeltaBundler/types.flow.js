@@ -17,6 +17,20 @@ export type MixedOutput = {|
 
 export type AsyncDependencyType = 'async' | 'prefetch';
 
+export type TransformResultExportModules = {
+  sideEffect: boolean,
+  exports: {
+    [k: string]: {
+      references: number,
+    },
+  },
+  exportAll: {
+    references: number,
+  },
+  exportDefault: {
+    references: number,
+  },
+};
 export type TransformResultDependency = {|
   /**
    * The literal name provided to a require or import call. For example 'foo' in
@@ -45,6 +59,7 @@ export type TransformResultDependency = {|
     +isOptional?: boolean,
 
     +locs: $ReadOnlyArray<BabelSourceLocation>,
+    +importee: TransformResultExportModules,
   |},
 |};
 
@@ -58,7 +73,10 @@ export type Module<T = MixedOutput> = {|
   +inverseDependencies: Set<string>,
   +output: $ReadOnlyArray<T>,
   +path: string,
+  +namedExports: Array<string>,
+  +importee: TransformResultExportModules,
   +getSource: () => Buffer,
+  +sourceAst: BabelNodeFile,
 |};
 
 export type Dependencies<T = MixedOutput> = Map<string, Module<T>>;
@@ -72,6 +90,8 @@ export type Graph<T = MixedOutput> = {|
 export type TransformResult<T = MixedOutput> = $ReadOnly<{|
   dependencies: $ReadOnlyArray<TransformResultDependency>,
   output: $ReadOnlyArray<T>,
+  namedExports: Array<string>,
+  sourceAst: BabelNodeFile,
 |}>;
 
 export type TransformResultWithSource<T = MixedOutput> = $ReadOnly<{|
@@ -117,4 +137,5 @@ export type SerializerOptions = {|
   +runModule: boolean,
   +sourceMapUrl: ?string,
   +sourceUrl: ?string,
+  treeShaking?: boolean,
 |};

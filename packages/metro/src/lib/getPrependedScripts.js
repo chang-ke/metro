@@ -14,7 +14,7 @@ const countLines = require('./countLines');
 const defaults = require('metro-config/src/defaults/defaults');
 const getPreludeCode = require('./getPreludeCode');
 const transformHelpers = require('./transformHelpers');
-
+const babylon = require('@babel/parser');
 const {compile} = require('metro-hermes-compiler');
 
 import type Bundler from '../Bundler';
@@ -90,6 +90,14 @@ function _getPrelude({
     getSource: (): Buffer => Buffer.from(code),
     inverseDependencies: new Set(),
     path: name,
+    namedExports: [],
+    sourceAst: babylon.parse(code),
+    importee: {
+      exports: {},
+      sideEffect: false,
+      exportAll: {references: 0},
+      exportDefault: {references: 0},
+    },
     output: [
       {
         type: 'js/script/virtual',

@@ -22,7 +22,7 @@ async function transform(
   {filename, options, src}: BabelTransformerArgs,
   assetRegistryPath: string,
   assetDataPlugins: $ReadOnlyArray<string>,
-): Promise<{ast: File, ...}> {
+): Promise<{ast: File, sourceAst: File, ...}> {
   options = options || {
     platform: '',
     projectRoot: '',
@@ -40,8 +40,11 @@ async function transform(
     options.publicPath,
   );
 
+  const ast = generateAssetCodeFileAst(assetRegistryPath, data);
+
   return {
-    ast: generateAssetCodeFileAst(assetRegistryPath, data),
+    ast,
+    sourceAst: ast,
   };
 }
 

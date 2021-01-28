@@ -56,6 +56,7 @@ export type BabelTransformerArgs = $ReadOnly<{|
 export type BabelTransformer = {|
   transform: BabelTransformerArgs => {
     ast: BabelNodeFile,
+    sourceAst: BabelNodeFile,
     functionMap: ?FBSourceFunctionMap,
     ...
   },
@@ -83,7 +84,7 @@ function transform({filename, options, plugins, src}: BabelTransformerArgs) {
     const {ast} = transformFromAstSync(sourceAst, src, babelConfig);
     const functionMap = generateFunctionMap(sourceAst, {filename});
 
-    return {ast: nullthrows(ast), functionMap};
+    return {ast: nullthrows(ast), sourceAst, functionMap};
   } finally {
     if (OLD_BABEL_ENV) {
       process.env.BABEL_ENV = OLD_BABEL_ENV;

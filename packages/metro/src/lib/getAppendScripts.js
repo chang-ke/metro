@@ -14,6 +14,7 @@ const countLines = require('./countLines');
 const getInlineSourceMappingURL = require('../DeltaBundler/Serializers/helpers/getInlineSourceMappingURL');
 const nullthrows = require('nullthrows');
 const path = require('path');
+const babylon = require('@babel/parser');
 const sourceMapString = require('../DeltaBundler/Serializers/sourceMapString');
 
 import type {Module} from '../DeltaBundler';
@@ -57,6 +58,14 @@ function getAppendScripts<T: number | string>(
       dependencies: new Map(),
       getSource: (): Buffer => Buffer.from(''),
       inverseDependencies: new Set(),
+      namedExports: [],
+      sourceAst: babylon.parse(''),
+      importee: {
+        exports: {},
+        sideEffect: false,
+        exportAll: {references: 0},
+        exportDefault: {references: 0},
+      },
       output: [
         {
           type: 'js/script/virtual',
@@ -83,6 +92,14 @@ function getAppendScripts<T: number | string>(
           dependencies: new Map(),
           getSource: (): Buffer => Buffer.from(''),
           inverseDependencies: new Set(),
+          namedExports: [],
+          sourceAst: babylon.parse(''),
+          importee: {
+            exports: {},
+            sideEffect: false,
+            exportAll: {references: 0},
+            exportDefault: {references: 0},
+          },
           output: [
             {
               type: 'js/script/virtual',
@@ -114,6 +131,14 @@ function getAppendScripts<T: number | string>(
       dependencies: new Map(),
       getSource: (): Buffer => Buffer.from(''),
       inverseDependencies: new Set(),
+      sourceAst: babylon.parse(''),
+      namedExports: [],
+      importee: {
+        exports: {},
+        sideEffect: false,
+        exportAll: {references: 0},
+        exportDefault: {references: 0},
+      },
       output: [
         {
           type: 'js/script/virtual',
@@ -134,6 +159,14 @@ function getAppendScripts<T: number | string>(
       dependencies: new Map(),
       getSource: (): Buffer => Buffer.from(''),
       inverseDependencies: new Set(),
+      namedExports: [],
+      sourceAst: babylon.parse(''),
+      importee: {
+        exports: {},
+        sideEffect: false,
+        exportAll: {references: 0},
+        exportDefault: {references: 0},
+      },
       output: [
         {
           type: 'js/script/virtual',

@@ -12,6 +12,7 @@
 'use strict';
 
 const babylon = require('@babel/parser');
+const {transformFromAstSync} = require('@babel/core');
 const collectDependencies = require('../collectDependencies');
 const dedent = require('dedent');
 const nullthrows = require('nullthrows');
@@ -35,6 +36,8 @@ const {any, objectContaining} = expect;
 
 const {InvalidRequireCallError} = collectDependencies;
 const opts = {
+  dev: false,
+  filename: 'index.js',
   asyncRequireModulePath: 'asyncRequire',
   dynamicRequires: 'reject',
   inlineableCalls: [],
@@ -43,7 +46,7 @@ const opts = {
 };
 
 it('collects unique dependency identifiers and transforms the AST', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     const a = require('b/lib/a');
     exports.do = () => require("do");
     if (!something) {
@@ -51,7 +54,11 @@ it('collects unique dependency identifiers and transforms the AST', () => {
     }
     require('do');
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'b/lib/a', data: objectContaining({asyncType: null})},
     {name: 'do', data: objectContaining({asyncType: null})},
@@ -70,7 +77,7 @@ it('collects unique dependency identifiers and transforms the AST', () => {
 });
 
 it('uses dependencyMapName parameter as-is if provided', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     const a = require('b/lib/a');
     exports.do = () => require("do");
     if (!something) {
@@ -78,10 +85,14 @@ it('uses dependencyMapName parameter as-is if provided', () => {
     }
     require('do');
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, {
-    ...opts,
-    dependencyMapName: '_$$_TEST_DEP_MAP',
-  });
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    {
+      ...opts,
+      dependencyMapName: '_$$_TEST_DEP_MAP',
+    },
+  );
   expect(dependencyMapName).toBe('_$$_TEST_DEP_MAP');
   expect(dependencies).toEqual([
     {name: 'b/lib/a', data: objectContaining({asyncType: null})},
@@ -101,10 +112,14 @@ it('uses dependencyMapName parameter as-is if provided', () => {
 });
 
 it('collects asynchronous dependencies', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     import("some/async/module").then(foo => {});
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'some/async/module', data: objectContaining({asyncType: 'async'})},
     {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -117,11 +132,15 @@ it('collects asynchronous dependencies', () => {
 });
 
 it('collects mixed dependencies as being sync', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     const a = require("some/async/module");
     import("some/async/module").then(foo => {});
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'some/async/module', data: objectContaining({asyncType: null})},
     {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -135,11 +154,15 @@ it('collects mixed dependencies as being sync', () => {
 });
 
 it('collects mixed dependencies as being sync; reverse order', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     import("some/async/module").then(foo => {});
     const a = require("some/async/module");
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'some/async/module', data: objectContaining({asyncType: null})},
     {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -153,10 +176,14 @@ it('collects mixed dependencies as being sync; reverse order', () => {
 });
 
 it('collects __jsResource calls', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     __jsResource("some/async/module");
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'some/async/module', data: objectContaining({asyncType: 'async'})},
     {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -169,11 +196,11 @@ it('collects __jsResource calls', () => {
 });
 
 it('collects conditionallySplitJSResource calls', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     __conditionallySplitJSResource("some/async/module", {mobileConfigName: 'aaa'});
     __conditionallySplitJSResource("some/async/module", {mobileConfigName: 'bbb'});
   `);
-  const {dependencies} = collectDependencies(ast, opts);
+  const {dependencies} = collectDependencies(ast, sourceAst, opts);
   expect(dependencies).toEqual([
     {name: 'some/async/module', data: objectContaining({asyncType: 'async'})},
     {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -182,10 +209,14 @@ it('collects conditionallySplitJSResource calls', () => {
 
 describe('import() prefetching', () => {
   it('collects prefetch calls', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       __prefetchImport("some/async/module");
     `);
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {
         name: 'some/async/module',
@@ -201,11 +232,11 @@ describe('import() prefetching', () => {
   });
 
   it('disable prefetch-only flag for mixed import/prefetch calls', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       __prefetchImport("some/async/module");
       import("some/async/module").then(() => {});
     `);
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     expect(dependencies).toEqual([
       {name: 'some/async/module', data: objectContaining({asyncType: 'async'})},
       {name: 'asyncRequire', data: objectContaining({asyncType: null})},
@@ -215,8 +246,12 @@ describe('import() prefetching', () => {
 
 describe('Evaluating static arguments', () => {
   it('supports template literals as arguments', () => {
-    const ast = astFromCode('require(`left-pad`)');
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {ast, sourceAst} = astFromCode('require(`left-pad`)');
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {name: 'left-pad', data: objectContaining({asyncType: null})},
     ]);
@@ -226,8 +261,12 @@ describe('Evaluating static arguments', () => {
   });
 
   it('supports template literals with static interpolations', () => {
-    const ast = astFromCode('require(`left${"-"}pad`)');
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {ast, sourceAst} = astFromCode('require(`left${"-"}pad`)');
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {name: 'left-pad', data: objectContaining({asyncType: null})},
     ]);
@@ -237,9 +276,9 @@ describe('Evaluating static arguments', () => {
   });
 
   it('throws template literals with dyncamic interpolations', () => {
-    const ast = astFromCode('let foo;require(`left${foo}pad`)');
+    const {ast, sourceAst} = astFromCode('let foo;require(`left${foo}pad`)');
     try {
-      collectDependencies(ast, opts);
+      collectDependencies(ast, sourceAst, opts);
       throw new Error('should not reach');
     } catch (error) {
       if (!(error instanceof InvalidRequireCallError)) {
@@ -250,9 +289,9 @@ describe('Evaluating static arguments', () => {
   });
 
   it('throws on tagged template literals', () => {
-    const ast = astFromCode('require(tag`left-pad`)');
+    const {ast, sourceAst} = astFromCode('require(tag`left-pad`)');
     try {
-      collectDependencies(ast, opts);
+      collectDependencies(ast, sourceAst, opts);
       throw new Error('should not reach');
     } catch (error) {
       if (!(error instanceof InvalidRequireCallError)) {
@@ -263,8 +302,12 @@ describe('Evaluating static arguments', () => {
   });
 
   it('supports multiple static strings concatenated', () => {
-    const ast = astFromCode('require("foo_" + "bar")');
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {ast, sourceAst} = astFromCode('require("foo_" + "bar")');
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {name: 'foo_bar', data: objectContaining({asyncType: null})},
     ]);
@@ -274,8 +317,12 @@ describe('Evaluating static arguments', () => {
   });
 
   it('supports concatenating strings and template literasl', () => {
-    const ast = astFromCode('require("foo_" + "bar" + `_baz`)');
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {ast, sourceAst} = astFromCode('require("foo_" + "bar" + `_baz`)');
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {name: 'foo_bar_baz', data: objectContaining({asyncType: null})},
     ]);
@@ -285,8 +332,14 @@ describe('Evaluating static arguments', () => {
   });
 
   it('supports using static variables in require statements', () => {
-    const ast = astFromCode('const myVar="my"; require("foo_" + myVar)');
-    const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+    const {ast, sourceAst} = astFromCode(
+      'const myVar="my"; require("foo_" + myVar)',
+    );
+    const {dependencies, dependencyMapName} = collectDependencies(
+      ast,
+      sourceAst,
+      opts,
+    );
     expect(dependencies).toEqual([
       {name: 'foo_my', data: objectContaining({asyncType: null})},
     ]);
@@ -298,9 +351,9 @@ describe('Evaluating static arguments', () => {
   });
 
   it('throws when requiring non-strings', () => {
-    const ast = astFromCode('require(1)');
+    const {ast, sourceAst} = astFromCode('require(1)');
     try {
-      collectDependencies(ast, opts);
+      collectDependencies(ast, sourceAst, opts);
       throw new Error('should not reach');
     } catch (error) {
       if (!(error instanceof InvalidRequireCallError)) {
@@ -311,15 +364,17 @@ describe('Evaluating static arguments', () => {
   });
 
   it('throws at runtime when requiring non-strings with special option', () => {
-    const ast = astFromCode('require(1)');
+    const {ast, sourceAst} = astFromCode('require(1)');
     const opts = {
+      dev: false,
+      filename: 'index.js',
       asyncRequireModulePath: 'asyncRequire',
       dynamicRequires: 'throwAtRuntime',
       inlineableCalls: [],
       keepRequireNames: true,
       allowOptionalDependencies: false,
     };
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     expect(dependencies).toEqual([]);
     expect(codeFromAst(ast)).toEqual(
       comparableCode(`
@@ -332,12 +387,14 @@ describe('Evaluating static arguments', () => {
 });
 
 it('exposes a string as `dependencyMapName` even without collecting dependencies', () => {
-  const ast = astFromCode('');
-  expect(collectDependencies(ast, opts).dependencyMapName).toEqual(any(String));
+  const {ast, sourceAst} = astFromCode('');
+  expect(collectDependencies(ast, sourceAst, opts).dependencyMapName).toEqual(
+    any(String),
+  );
 });
 
 it('ignores require functions defined defined by lower scopes', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     const a = require('b/lib/a');
     exports.do = () => require("do");
     if (!something) {
@@ -354,7 +411,11 @@ it('ignores require functions defined defined by lower scopes', () => {
       require('nonExistantModule');
     }
   `);
-  const {dependencies, dependencyMapName} = collectDependencies(ast, opts);
+  const {dependencies, dependencyMapName} = collectDependencies(
+    ast,
+    sourceAst,
+    opts,
+  );
   expect(dependencies).toEqual([
     {name: 'b/lib/a', data: objectContaining({asyncType: null})},
     {name: 'do', data: objectContaining({asyncType: null})},
@@ -380,13 +441,13 @@ it('ignores require functions defined defined by lower scopes', () => {
 });
 
 it('collects imports', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     import b from 'b/lib/a';
     import * as d from 'do';
     import type {s} from 'setup/something';
   `);
 
-  const {dependencies} = collectDependencies(ast, opts);
+  const {dependencies} = collectDependencies(ast, sourceAst, opts);
 
   expect(dependencies).toEqual([
     {name: 'b/lib/a', data: objectContaining({asyncType: null})},
@@ -396,13 +457,13 @@ it('collects imports', () => {
 });
 
 it('collects export from', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     export type {Apple} from 'Apple';
     export {Banana} from 'Banana';
     export * from 'Kiwi';
   `);
 
-  const {dependencies} = collectDependencies(ast, opts);
+  const {dependencies} = collectDependencies(ast, sourceAst, opts);
   expect(dependencies).toEqual([
     {name: 'Apple', data: objectContaining({asyncType: null})},
     {name: 'Banana', data: objectContaining({asyncType: null})},
@@ -422,14 +483,14 @@ it('records locations of dependencies', () => {
     require('foo'); __prefetchImport('baz');
     interopRequireDefault(require('quux')); // Simulated Babel output
   `;
-  const ast = astFromCode(code);
+  const {ast, sourceAst} = astFromCode(code);
 
   // Babel does not guarantee a loc on generated `require()`s.
   // $FlowFixMe Discovered when typing @babel/parser
   delete ast.program.body[ast.program.body.length - 1].expression.arguments[0]
     .loc;
 
-  const {dependencies} = collectDependencies(ast, opts);
+  const {dependencies} = collectDependencies(ast, sourceAst, opts);
 
   for (const dep of dependencies) {
     expect(dep).toEqual(
@@ -473,6 +534,8 @@ it('records locations of dependencies', () => {
 
 describe('optional dependencies', () => {
   const opts: Options<> = {
+    dev: false,
+    filename: 'index.js',
     asyncRequireModulePath: 'asyncRequire',
     dynamicRequires: 'reject',
     inlineableCalls: [],
@@ -507,7 +570,7 @@ describe('optional dependencies', () => {
     expect(dependencies).toHaveLength(expectedCount);
   };
   it('dependency in try-block within 1-level will be optional', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       function fFunc() {
         import('not-optional-async-f').then();
       }
@@ -530,11 +593,11 @@ describe('optional dependencies', () => {
       }
       `);
 
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     validateDependencies(dependencies, 8);
   });
   it('nested try-block follows the inner-most scope', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
     try {
       const a = require('optional-a');
       try{
@@ -544,46 +607,46 @@ describe('optional dependencies', () => {
     } catch(e) {}
     `);
 
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     validateDependencies(dependencies, 4);
   });
   it('can handle single-line statement', () => {
-    const ast = astFromCode(
+    const {ast, sourceAst} = astFromCode(
       "try { const a = require('optional-a') } catch (e) {}",
     );
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     validateDependencies(dependencies, 1);
   });
   it('independent of sibiling context', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       try {
         const x = whatever;
         const a = x ? require('optional-a') : require('optional-b');
       } catch (e) {}
     `);
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     validateDependencies(dependencies, 2);
   });
   it('ignores require functions defined by lower scopes', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       const f = (require) => {
         try {
           const c = require('not-dependency');
         } catch (e) {}
       };
     `);
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     expect(dependencies).toHaveLength(0);
   });
   it('supports using static variables in require statements', () => {
-    const ast = astFromCode(`
+    const {ast, sourceAst} = astFromCode(`
       const myVar="my";
       try {
         require("foo_" + myVar);
         require(\`bar_\${5 + 2}\`);
       } catch (e) {}
       `);
-    const {dependencies} = collectDependencies(ast, opts);
+    const {dependencies} = collectDependencies(ast, sourceAst, opts);
     expect(dependencies).toEqual([
       {
         name: 'foo_my',
@@ -604,25 +667,37 @@ describe('optional dependencies', () => {
         const b = require(\`A-\${3 + n}\`);
       } catch (e) {}
     `);
-    const {dependencies: deps1} = collectDependencies(ast(), opts);
+    const {dependencies: deps1} = collectDependencies(
+      ast().ast,
+      ast().sourceAst,
+      opts,
+    );
     expect(deps1).toEqual([
       {name: 'A-3', data: objectContaining({isOptional: true})},
       {name: 'A-5', data: objectContaining({isOptional: true})},
     ]);
 
-    const {dependencies: deps2} = collectDependencies(ast(), {
-      ...opts,
-      allowOptionalDependencies: false,
-    });
+    const {dependencies: deps2} = collectDependencies(
+      ast().ast,
+      ast().sourceAst,
+      {
+        ...opts,
+        allowOptionalDependencies: false,
+      },
+    );
     expect(deps2).toEqual([
       {name: 'A-3', data: expect.not.objectContaining({isOptional: true})},
       {name: 'A-5', data: expect.not.objectContaining({isOptional: true})},
     ]);
 
-    const {dependencies: deps3} = collectDependencies(ast(), {
-      ...opts,
-      allowOptionalDependencies: {exclude: ['A-5']},
-    });
+    const {dependencies: deps3} = collectDependencies(
+      ast().ast,
+      ast().sourceAst,
+      {
+        ...opts,
+        allowOptionalDependencies: {exclude: ['A-5']},
+      },
+    );
     expect(deps3).toEqual([
       {name: 'A-3', data: objectContaining({isOptional: true})},
       {name: 'A-5', data: expect.not.objectContaining({isOptional: true})},
@@ -631,7 +706,7 @@ describe('optional dependencies', () => {
 });
 
 it('uses the dependency transformer specified in the options to transform the dependency calls', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
     const a = require('b/lib/a');
     require(1)
     import b from 'b/lib/b';
@@ -643,7 +718,7 @@ it('uses the dependency transformer specified in the options to transform the de
     __prefetchImport("some/async/module");
   `);
 
-  const {ast: transformedAst} = collectDependencies(ast, {
+  const {ast: transformedAst} = collectDependencies(ast, sourceAst, {
     ...opts,
     dynamicRequires: 'throwAtRuntime',
     dependencyTransformer: MockDependencyTransformer,
@@ -664,7 +739,7 @@ it('uses the dependency transformer specified in the options to transform the de
 });
 
 it('uses the dependency registry specified in the options to register dependencies', () => {
-  const ast = astFromCode(`
+  const {ast, sourceAst} = astFromCode(`
       const a = require('b/lib/a');
       import b from 'b/lib/b';
       export {Banana} from 'Banana';
@@ -675,7 +750,7 @@ it('uses the dependency registry specified in the options to register dependenci
       __prefetchImport("a/prefetch/module");
     `);
 
-  const {dependencies} = collectDependencies(ast, {
+  const {dependencies} = collectDependencies(ast, sourceAst, {
     ...opts,
     dependencyTransformer: MockDependencyTransformer,
     dependencyRegistry: new MockModuleDependencyRegistry(),
@@ -732,11 +807,16 @@ function formatLoc(loc, depIndex, dep, code) {
   });
 }
 
-function astFromCode(code: string): BabelNodeFile {
-  return babylon.parse(code, {
-    plugins: ['dynamicImport', 'flow'],
+function astFromCode(
+  code: string,
+): {ast: BabelNodeFile, sourceAst: BabelNodeFile} {
+  const sourceAst = babylon.parse(code, {
     sourceType: 'module',
   });
+  const {ast} = transformFromAstSync(sourceAst, code, {
+    plugins: ['dynamicImport', 'flow'],
+  });
+  return {ast: ast || sourceAst, sourceAst};
 }
 
 // Mock registry that collects *all* `registerDependency` calls.
@@ -745,6 +825,7 @@ function astFromCode(code: string): BabelNodeFile {
 // `collectDependencies` implementations and should be tested there.
 class MockModuleDependencyRegistry<TSplitCondition>
   implements ModuleDependencyRegistry<TSplitCondition> {
+  _exports: Set<string> = new Set();
   _dependencies: Array<InternalDependency<TSplitCondition>> = [];
 
   registerDependency(
@@ -756,6 +837,12 @@ class MockModuleDependencyRegistry<TSplitCondition>
       asyncType: qualifier.asyncType,
       isOptional: qualifier.optional ?? false,
       locs: [],
+      importee: {
+        exports: {},
+        sideEffect: false,
+        exportAll: {references: 0},
+        exportDefault: {references: 0},
+      },
     };
 
     if (qualifier.splitCondition) {
@@ -764,6 +851,13 @@ class MockModuleDependencyRegistry<TSplitCondition>
 
     this._dependencies.push(data);
     return data;
+  }
+  registerExport(name: string) {
+    this._exports.add(name);
+  }
+
+  getExports(): Array<string> {
+    return [...this._exports];
   }
 
   getDependencies(): Array<InternalDependency<TSplitCondition>> {

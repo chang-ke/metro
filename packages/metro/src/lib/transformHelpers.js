@@ -167,4 +167,5 @@ async function getResolveDependencyFn(
 module.exports = {
   getTransformFn,
   getResolveDependencyFn,
+  calcTransformerOptions,
 };

@@ -45,6 +45,7 @@ const {
   Logger,
   Logger: {createActionStartEntry, createActionEndEntry, log},
 } = require('metro-core');
+const {calcTransformerOptions} = require('./lib/transformHelpers');
 
 import type {AssetData} from './Assets';
 import type {ExplodedSourceMap} from './DeltaBundler/Serializers/getExplodedSourceMap';
@@ -67,6 +68,7 @@ import type {
   ActionStartLogEntry,
   LogEntry,
 } from 'metro-core/src/Logger';
+import treeShaking from 'metro-tree-shaking';
 
 export type SegmentLoadData = {[number]: [Array<number>, ?number], ...};
 export type BundleMetadata = {
@@ -187,6 +189,28 @@ class Server {
         shallow: graphOptions.shallow,
       },
     );
+    const {
+      getTransformOptions: _getTransformOptions,
+      postMinifyProcess: _postMinifyProcess,
+      transformVariants: _transformVariants,
+      workerPath: _workerPath,
+      ...transformerConfig
+    } = this._config.transformer;
+
+    if (transformerConfig.experimentalTreeShaking) {
+      // $FlowFixMe await await is correctly...
+      const transformerOptions = await calcTransformerOptions(
+        [entryFile],
+        this._bundler.getBundler(),
+        this._bundler.getDeltaBundler(),
+        this._config,
+        transformOptions,
+      );
+      await treeShaking(graph, transformerConfig, this._config.projectRoot, {
+        ...transformerOptions,
+        inlineRequires: !!transformerOptions.inlineRequires,
+      });
+    }
 
     const entryPoint = path.resolve(this._config.projectRoot, entryFile);
 

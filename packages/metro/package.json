@@ -52,6 +52,7 @@
     "metro-symbolicate": "0.64.0",
     "metro-transform-plugins": "0.64.0",
     "metro-transform-worker": "0.64.0",
+    "metro-tree-shaking": "0.64.0",
     "mime-types": "^2.1.27",
     "mkdirp": "^0.5.1",
     "node-fetch": "^2.2.0",
